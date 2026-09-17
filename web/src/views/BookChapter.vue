@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div
     class="chapter-wrapper"
     ref="chapterWrapper"
@@ -295,6 +295,23 @@ const popCataTogger = () => {
 // 获取章节内容
 const chapterData = ref([]);
 const noPoint = ref(true);
+
+// 监听状态栏摸鱼阅读的章节同步消息，收到后跳转面板到对应章节
+const handleStatusBarSync = (event) => {
+  const message = event.data;
+  if (message?.command !== "syncProgressFromStatusBar") return;
+  const { chapterIndex: idx, chapterPos: pos } = message.progress || {};
+  if (typeof idx !== "number") return;
+  if (idx === chapterIndex.value) {
+    // 同章节：只滚动到对应位置，不重新加载
+    toChapterPos(pos);
+    saveReadingBookProgressToBrowser(idx, pos);
+  } else {
+    // 跨章节：重新加载
+    getContent(idx, true, pos);
+  }
+};
+
 const getContent = (index, reloadChapter = true, chapterPos = 0) => {
   if (reloadChapter) {
     //展示进度条
@@ -382,6 +399,16 @@ const saveReadingBookProgressToBrowser = (index, pos) => {
   //保存sessionStorage
   sessionStorage.setItem("chapterIndex", index);
   sessionStorage.setItem("chapterPos", String(pos));
+
+  // 同步给 VSCode 扩展端，状态栏跟随面板进度
+  WEB.postReadingProgress({
+    bookUrl,
+    bookName: sessionStorage.getItem("bookName"),
+    bookAuthor: sessionStorage.getItem("bookAuthor"),
+    chapterIndex: index,
+    chapterPos: pos,
+    chapterTitle: catalog.value[index]?.title
+  });
 };
 
 // 阅读记录保存到APP
@@ -631,6 +658,8 @@ onMounted(() => {
   }
   onResize();
   window.addEventListener("resize", onResize);
+  // 监听状态栏摸鱼阅读的章节同步
+  window.addEventListener("message", handleStatusBarSync);
   // window.addEventListener("resize", () => reobserveLoading());
   loadingWrapper(
     API.getChapterList(bookUrl).then(
@@ -667,6 +696,7 @@ onUnmounted(() => {
   clearInterval(saveRBPToAppId);
   window.removeEventListener("keyup", handleKeyPress);
   window.removeEventListener("resize", onResize);
+  window.removeEventListener("message", handleStatusBarSync);
   // 兼容Safari < 14
   document.removeEventListener("visibilitychange", onVisibilityChange);
   readSettingsVisible.value = false;

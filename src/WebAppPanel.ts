@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { getUri } from "./utilities/getUri";
+import { LegadoStatusBar } from "./LegadoStatusBar";
 
 export class WebAppPanel {
   public static currentPanel: WebAppPanel | undefined;
@@ -75,6 +76,20 @@ export class WebAppPanel {
     WebAppPanel.currentPanel = undefined;
   }
 
+  /**
+   * 把状态栏摸鱼阅读的章节切换进度同步回 webview 面板，
+   * 让面板也跳转到对应章节（双向同步）
+   */
+  public static syncProgressToPanel(progress: {
+    chapterIndex: number;
+    chapterPos: number;
+  }) {
+    WebAppPanel.currentPanel?._panel.webview.postMessage({
+      command: "syncProgressFromStatusBar",
+      progress
+    });
+  }
+
   public reload() {
     this._panel.webview.html = "";
     setTimeout(() => this._update(), 0);
@@ -116,6 +131,10 @@ export class WebAppPanel {
         return;
       case "close":
         WebAppPanel.kill();
+        return;
+      case "readingProgress":
+        // webview 面板进度变化时同步给状态栏
+        LegadoStatusBar.current?.updateFromPanelProgress(message.progress);
         return;
     }
   }

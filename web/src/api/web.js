@@ -66,6 +66,24 @@ const closePanel = () => {
   }
 };
 
+/**
+ * 把当前阅读进度同步给 VSCode 扩展端，状态栏会跟随更新
+ * @param {Object} progress - 阅读进度
+ * @param {string} progress.bookUrl
+ * @param {string} progress.bookName
+ * @param {string} progress.bookAuthor
+ * @param {number} progress.chapterIndex
+ * @param {number} progress.chapterPos
+ * @param {string} [progress.chapterTitle]
+ */
+const postReadingProgress = (progress) => {
+  if (!vscode || !progress) return;
+  vscode.postMessage({
+    command: "readingProgress",
+    progress
+  });
+};
+
 export default {
   isVscode,
   getPanelTitle,
@@ -74,5 +92,6 @@ export default {
   setLegadoWebServeUrl,
   checkLegadoWebServeUrl,
   reload,
-  closePanel
+  closePanel,
+  postReadingProgress
 };
