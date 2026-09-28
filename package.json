@@ -11,18 +11,16 @@
     "摸鱼",
     "学习"
   ],
-  "publisher": "sunrishe",
+  "publisher": "xiyi20",
   "license": "GPL-3.0",
-  "version": "2.9.5",
+  "version": "3.0.0",
   "icon": "public/ic_launcher.png",
-  "qna": "https://github.com/sunrishe/legado-vscode/issues",
   "bugs": {
-    "url": "https://github.com/sunrishe/legado-vscode/issues",
-    "email": "i@sunrishe.com"
+    "url": "https://github.com/xiyi20/legado-vscode/issues"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/sunrishe/legado-vscode.git"
+    "url": "https://github.com/xiyi20/legado-vscode.git"
   },
   "engines": {
     "vscode": "^1.80.0"

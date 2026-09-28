@@ -73,10 +73,10 @@ export class LegadoStatusBar {
 
   constructor() {
     this.statusItem = vscode.window.createStatusBarItem(
-      vscode.StatusBarAlignment.Right,
-      100
+      vscode.StatusBarAlignment.Left,
+      Number.MIN_SAFE_INTEGER
     );
-    this.statusItem.name = "阅读APP 状态栏";
+    this.statusItem.name = "阅读APP";
     // 初始无进度时点击会打开阅读APP书架；有进度后改为下一行（在 updateStatusBar 中动态切换）
     this.statusItem.command = "legado-vscode.openLegado";
 
