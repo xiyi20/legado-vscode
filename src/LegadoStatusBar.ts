@@ -71,6 +71,9 @@ export class LegadoStatusBar {
   /** 状态栏主动同步进度给面板后，面板会回流一次进度，该标志用于跳过回流避免覆盖状态栏位置 */
   private expectPanelEcho: boolean = false;
 
+  /** Ctrl+B 快速隐藏状态栏阅读内容（摸鱼紧急隐藏） */
+  private manuallyHidden: boolean = false;
+
   constructor() {
     this.statusItem = vscode.window.createStatusBarItem(
       vscode.StatusBarAlignment.Left,
@@ -419,6 +422,24 @@ export class LegadoStatusBar {
   }
 
   private updateStatusBar() {
+    // 只要存在阅读进度就激活 ctrl+b 快捷键（隐藏状态下也需要能恢复）
+    vscode.commands.executeCommand(
+      "setContext",
+      "legado-vscode:readingActive",
+      this.enabled && !!this.displayProgress
+    );
+
+    // Ctrl+B 紧急隐藏：完全隐藏状态栏阅读内容
+    if (this.manuallyHidden) {
+      this.statusItem.hide();
+      vscode.commands.executeCommand(
+        "setContext",
+        "legado-vscode:statusBarReady",
+        false
+      );
+      return;
+    }
+
     // 未开启功能：完全隐藏
     if (!this.enabled) {
       this.statusItem.hide();
@@ -459,6 +480,16 @@ export class LegadoStatusBar {
   }
 
   // ============ 翻行/翻章（命令入口） ============
+
+  /** Ctrl+B 快速隐藏/恢复状态栏阅读内容 */
+  public toggleHidden() {
+    this.manuallyHidden = !this.manuallyHidden;
+    if (!this.manuallyHidden && !this.displayProgress) {
+      // 恢复后仍无进度，提示可通过点击打开书架
+      vscode.window.setStatusBarMessage("$(book) 阅读已恢复", 2000);
+    }
+    this.updateStatusBar();
+  }
 
   public prevLine() {
     if (!this.displayProgress) return;

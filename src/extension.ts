@@ -37,13 +37,19 @@ export function activate(context: vscode.ExtensionContext) {
     "legado-vscode.statusBarGotoLine",
     () => LegadoStatusBar.current?.gotoLine()
   );
+  // Ctrl+B 快速隐藏/恢复状态栏阅读内容
+  const toggleHidden = vscode.commands.registerCommand(
+    "legado-vscode.statusBarToggleHidden",
+    () => LegadoStatusBar.current?.toggleHidden()
+  );
 
   context.subscriptions.push(
     openVueApp,
     closeVueApp,
     prevLine,
     nextLine,
-    gotoLine
+    gotoLine,
+    toggleHidden
   );
 }
 

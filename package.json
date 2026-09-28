@@ -13,7 +13,7 @@
   ],
   "publisher": "xiyi20",
   "license": "GPL-3.0",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "icon": "public/ic_launcher.png",
   "bugs": {
     "url": "https://github.com/xiyi20/legado-vscode/issues"
@@ -61,6 +61,11 @@
         "title": "状态栏摸鱼：跳转到行",
         "category": "阅读APP Legado",
         "enablement": "legado-vscode:statusBarReady"
+      },
+      {
+        "command": "legado-vscode.statusBarToggleHidden",
+        "title": "状态栏摸鱼：快速隐藏/恢复",
+        "category": "阅读APP Legado"
       }
     ],
     "keybindings": [
@@ -73,6 +78,11 @@
         "command": "legado-vscode.statusBarNextLine",
         "key": "ctrl+alt+k",
         "when": "legado-vscode:statusBarReady"
+      },
+      {
+        "command": "legado-vscode.statusBarToggleHidden",
+        "key": "ctrl+b",
+        "when": "legado-vscode:readingActive"
       }
     ],
     "configuration": {
