@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { get } from "http";
-import { get as getHttps } from "https";
+import { get as getHttps, request as requestHttps } from "https";
+import { request } from "http";
 import { WebAppPanel } from "./WebAppPanel";
 
 /** 阅读进度数据：由 webview 面板同步过来 */
@@ -73,6 +74,12 @@ export class LegadoStatusBar {
 
   /** Ctrl+B 快速隐藏状态栏阅读内容（摸鱼紧急隐藏） */
   private manuallyHidden: boolean = false;
+
+  /** 上一次直接写回APP进度的时间戳（节流） */
+  private lastSaveToAppTime: number = 0;
+
+  /** 节流窗口内延迟补发保存的定时器 */
+  private saveToAppTimer: NodeJS.Timeout | null = null;
 
   constructor() {
     this.statusItem = vscode.window.createStatusBarItem(
@@ -257,6 +264,99 @@ export class LegadoStatusBar {
         req.destroy(new Error("请求超时"));
       });
       req.end();
+    });
+  }
+
+  /** 用 node 内置 http/https 模块发送 JSON POST 请求 */
+  private httpPost<T>(relativePath: string, body: unknown): Promise<T> {
+    return new Promise((resolve, reject) => {
+      if (!this.webServeUrl) {
+        reject(new Error("未配置阅读APP的WEB服务地址"));
+        return;
+      }
+      const fullUrl = this.webServeUrl + relativePath;
+      let parsed: URL;
+      try {
+        parsed = new URL(fullUrl);
+      } catch (e) {
+        reject(e);
+        return;
+      }
+      const payload = JSON.stringify(body);
+      const client = parsed.protocol === "https:" ? requestHttps : request;
+      const req = client(
+        {
+          hostname: parsed.hostname,
+          port: parsed.port || (parsed.protocol === "https:" ? 443 : 80),
+          path: parsed.pathname + parsed.search,
+          method: "POST",
+          headers: {
+            "User-Agent": "legado-vscode-statusbar",
+            "Content-Type": "application/json;charset=UTF-8",
+            "Content-Length": Buffer.byteLength(payload)
+          },
+          timeout: 30000
+        },
+        (res) => {
+          let data = "";
+          res.setEncoding("utf8");
+          res.on("data", (chunk) => (data += chunk));
+          res.on("end", () => {
+            try {
+              resolve(JSON.parse(data) as T);
+            } catch (e) {
+              reject(e);
+            }
+          });
+        }
+      );
+      req.on("error", reject);
+      req.on("timeout", () => {
+        req.destroy(new Error("请求超时"));
+      });
+      req.write(payload);
+      req.end();
+    });
+  }
+
+  /**
+   * 把当前阅读进度写回阅读APP（/saveBookProgress）。
+   * 面板打开时由 web 前端负责保存，这里只在面板关闭（无 currentPanel）时兜底，
+   * 避免与面板的定时保存重复请求。
+   */
+  private saveProgressToApp() {
+    const p = this.displayProgress;
+    // 面板打开时由 web 前端负责保存进度，状态栏不重复写
+    if (!p || !!WebAppPanel.currentPanel) return;
+    // 与 web 端一致的节流：10 秒内不重复保存；窗口内的最后一次变化延迟补发，确保最终位置被保存
+    const now = Date.now();
+    const wait = 10000 - (now - this.lastSaveToAppTime);
+    if (wait <= 0) {
+      this.doSaveProgressToApp();
+    } else if (!this.saveToAppTimer) {
+      this.saveToAppTimer = setTimeout(() => {
+        this.saveToAppTimer = null;
+        this.doSaveProgressToApp();
+      }, wait);
+    }
+  }
+
+  /** 实际发送 /saveBookProgress 请求 */
+  private doSaveProgressToApp() {
+    const p = this.displayProgress;
+    if (!p || !!WebAppPanel.currentPanel) return;
+    this.lastSaveToAppTime = Date.now();
+    const body = {
+      name: p.bookName,
+      author: p.bookAuthor,
+      durChapterIndex: p.chapterIndex,
+      durChapterPos: p.chapterPos,
+      durChapterTime: new Date().getTime(),
+      durChapterTitle:
+        p.chapterTitle || `第${p.chapterIndex + 1}章`
+    };
+    this.httpPost("/saveBookProgress", body).catch(() => {
+      // 保存失败静默处理（服务不可达等），不打扰摸鱼
     });
   }
 
@@ -566,6 +666,7 @@ export class LegadoStatusBar {
       chapterIndex: this.displayProgress.chapterIndex,
       chapterPos: this.displayProgress.chapterPos
     });
+    this.saveProgressToApp();
   }
 
   /**
@@ -581,6 +682,7 @@ export class LegadoStatusBar {
       chapterIndex: this.displayProgress.chapterIndex,
       chapterPos: pos
     });
+    this.saveProgressToApp();
   }
 
   /** 当前行索引对应的章节字符偏移 */
@@ -619,6 +721,15 @@ export class LegadoStatusBar {
   }
 
   public dispose() {
+    // 关闭插件时把节流窗口内的最后进度立即落盘
+    if (this.saveToAppTimer) {
+      clearTimeout(this.saveToAppTimer);
+      this.saveToAppTimer = null;
+      const p = this.displayProgress;
+      if (p && !WebAppPanel.currentPanel) {
+        this.doSaveProgressToApp();
+      }
+    }
     while (this.disposables.length) {
       const d = this.disposables.pop();
       d?.dispose();
